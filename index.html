@@ -1,265 +1,248 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>PBO Quest & Items Helper</title>
-
-  <!-- PapaParse -->
+  <meta charset="UTF-8" />
+  <title>Quest & Tools Helper</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-
   <style>
-    :root{
-      --accent:#0b74de;
-      --highlight:#FFE8C6;
-      --bg:#ffffff;
-      --text:#0b1720;
-      --card-radius:10px;
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 0;
+      background: #f5f5f5;
+      color: #222;
     }
-    body{font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial;margin:0;background:var(--bg);color:var(--text)}
-    header{display:flex;justify-content:flex-end;padding:12px}
-    .container{max-width:1100px;margin:0 auto;padding:12px}
-    button{background:var(--accent);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
-    button.secondary{background:#eef3fb;color:var(--text)}
-    h1{margin:0 0 12px 0;font-size:1.25rem}
-    .loading-screen{height:100vh;display:flex;align-items:center;justify-content:center}
-    .loader-inner{text-align:center}
-    .loader-inner img{max-width:220px;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto}
-    .card{border-radius:var(--card-radius);padding:14px;margin:14px 0;box-shadow:0 6px 18px rgba(10,20,40,0.06);border:1px solid rgba(10,20,40,0.04);background:#fff}
-    .card.highlight{background:var(--highlight)}
-    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:12px}
-    select,input[type="text"]{padding:8px;border-radius:8px;border:1px solid #e6eef9;width:100%;max-width:420px}
-    table{width:100%;border-collapse:collapse;margin-top:12px}
-    th,td{padding:8px;border-bottom:1px solid #eef3fb;text-align:left;vertical-align:top}
-    pre.content{white-space:pre-wrap;font-family:inherit;margin:0}
-    .muted{color:#6b7280}
-    .hidden{display:none}
-    .dark-mode{--bg:#0b0b0b;--text:#e6eef9;background:#0b0b0b;color:#e6eef9}
-    .dark-mode .card{box-shadow:none;border:1px solid rgba(255,255,255,0.04);background:#0f1113}
-    .dark-mode .card.highlight{background:#5a4636}
-    .dark-mode select,input[type="text"]{background:#111214;color:#e6eef9;border:1px solid rgba(255,255,255,0.06)}
-    .dark-mode th,.dark-mode td{border-bottom:1px solid rgba(255,255,255,0.06);color:var(--text)}
-    .dark-mode button{background:#1f2937;color:var(--text)}
-    .dark-mode button.secondary{background:#0b1220;color:var(--text);border:1px solid rgba(255,255,255,0.06)}
+    .dark-mode {
+      background: #121212;
+      color: #eee;
+    }
+    .container {
+      max-width: 1000px;
+      margin: auto;
+      padding: 20px;
+    }
+    h2 { margin-top: 30px; }
+    select, input, button {
+      padding: 6px; margin: 4px;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 10px;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: left;
+    }
+    .dark-mode table, .dark-mode th, .dark-mode td {
+      border: 1px solid #555;
+    }
+    .section {
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 8px;
+    }
+    .highlight { background: #FFE8C6; }
+    .dark-mode .highlight { background: #5c4520; }
+    #loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    #loader img { max-width: 200px; margin-bottom: 20px; }
+    #main { display: none; }
   </style>
 </head>
 <body>
-  <header>
-    <button id="darkToggle" class="secondary">🌙 Dark Mode</button>
-  </header>
+  <div id="loader">
+    <img src="https://i.imgur.com/XZcfQzw.png" alt="Loading">
+    <button id="loadBtn">Load Data</button>
+  </div>
 
-  <main class="container">
-    <!-- Loading -->
-    <div id="loading" class="loading-screen">
-      <div class="loader-inner">
-        <img src="https://i.imgur.com/XZcfQzw.png" alt="Logo">
-        <div style="margin-top:8px">
-          <button id="loadBtn">Load Data</button>
-        </div>
-        <div id="loadStatus" class="muted" style="margin-top:10px"></div>
-      </div>
+  <div id="main" class="container">
+    <button id="darkToggle">Toggle Dark Mode</button>
+
+    <div id="questHelper" class="section highlight">
+      <h2>Quest Helper</h2>
+      <select id="questRegion"><option value="">Select Region</option></select>
+      <select id="questQuest"><option value="">Select Quest</option></select>
+      <button onclick="showQuest()">Show</button>
+      <div id="questResult"></div>
     </div>
 
-    <!-- App -->
-    <div id="app" class="hidden">
-      <h1>PBO Quest & Items Helper</h1>
-
-      <!-- Quest Helper -->
-      <div class="card highlight">
-        <h2>Quest Helper</h2>
-        <div class="row">
-          <select id="questRegion"></select>
-          <select id="questName"></select>
-          <button id="questShow">Show</button>
-        </div>
-        <div id="questResult"></div>
-      </div>
-
-      <!-- Special Item Finder -->
-      <div class="card">
-        <h2>Special Item Finder</h2>
-        <div class="row">
-          <input type="text" id="itemSearch" placeholder="Search item manually"/>
-          <button id="itemSearchBtn">Search</button>
-        </div>
-        <div class="row">
-          <select id="itemRegion"></select>
-          <select id="itemLocation"></select>
-          <select id="itemName"></select>
-          <button id="itemFilterBtn">Search</button>
-        </div>
-        <div id="itemResult"></div>
-      </div>
-
-      <!-- EV Spot Finder -->
-      <div class="card highlight">
-        <h2>EV Spot Finder</h2>
-        <div class="row">
-          <select id="evRegion"></select>
-          <select id="evStat"></select>
-          <button id="evShow">Show</button>
-        </div>
-        <div id="evResult"></div>
-      </div>
-
-      <!-- Regi Trio Check -->
-      <div class="card">
-        <h2>Regi Trio Check</h2>
-        <div class="row">
-          <select id="regiTime"></select>
-        </div>
-        <div id="regiResult"></div>
-      </div>
-
-      <!-- Shoal Cave Check -->
-      <div class="card highlight">
-        <h2>Shoal Cave Check</h2>
-        <div id="shoalResult"></div>
-      </div>
+    <div id="specialItem" class="section">
+      <h2>Special Item Finder</h2>
+      <input type="text" id="itemSearch" placeholder="Enter item name">
+      <button onclick="manualItemSearch()">Search</button>
+      <br>
+      <select id="itemRegion"><option value="">Select Region</option></select>
+      <select id="itemLocation"><option value="">Select Location</option></select>
+      <select id="itemItem"><option value="">Select Item</option></select>
+      <button onclick="filteredItemSearch()">Search</button>
+      <div id="itemResult"></div>
     </div>
-  </main>
+
+    <div id="evSpot" class="section highlight">
+      <h2>EV Spot Finder</h2>
+      <select id="evRegion"><option value="">Select Region</option></select>
+      <select id="evValue"><option value="">Select EV</option></select>
+      <button onclick="showEV()">Show</button>
+      <div id="evResult"></div>
+    </div>
+
+    <div id="regiCheck" class="section">
+      <h2>Regi Trio Check</h2>
+      <select id="regiTime"><option value="">Select Time</option></select>
+      <div id="regiResult"></div>
+    </div>
+
+    <div id="shoalCave" class="section highlight">
+      <h2>Shoal Cave Check</h2>
+      <button onclick="checkShoal()">Check Tide</button>
+      <div id="shoalResult"></div>
+    </div>
+  </div>
 
 <script>
-  // Sheet URLs
-  const urls = {
-    quest:"https://docs.google.com/spreadsheets/d/e/2PACX-1vSLUoaCoGaRwhc7rdFxpQuKmHSdYG5vlzYSjXYSAutTfowLYfmuuKxULAE-ePGl66uZpO7JKk97Yoo7/pub?output=csv",
-    items:"https://docs.google.com/spreadsheets/d/e/2PACX-1vSVGd00wRMYJ_keK_ESGV_RUw6yUHUbsexmiXfm9pp8vw_oUGnvYmCKMCNaKwvTNVi8lXED_Qi11edq/pub?output=csv",
-    ev:"https://docs.google.com/spreadsheets/d/e/2PACX-1vS3s-al3s9rwdhK0FHls7J368zMl0Hdryc_y6MVwwXaiWLpgzImXs_9YsC5lXkwRdi_aPMi_gRHfsei/pub?output=csv",
-    regi:"https://docs.google.com/spreadsheets/d/e/2PACX-1vSnZTHT3SeW7VWywFDBWhvjor0NqrwEcXPyBPOH53FD_Z5GHPNhO4NlGfpzniRjpuJBHna8vZJ1Ndia/pub?output=csv"
+let questData=[], itemData=[], evData=[], regiData=[];
+
+const questUrl="https://docs.google.com/spreadsheets/d/e/2PACX-1vSLUoaCoGaRwhc7rdFxpQuKmHSdYG5vlzYSjXYSAutTfowLYfmuuKxULAE-ePGl66uZpO7JKk97Yoo7/pub?output=csv";
+const itemUrl="https://docs.google.com/spreadsheets/d/e/2PACX-1vSVGd00wRMYJ_keK_ESGV_RUw6yUHUbsexmiXfm9pp8vw_oUGnvYmCKMCNaKwvTNVi8lXED_Qi11edq/pub?output=csv";
+const evUrl="https://docs.google.com/spreadsheets/d/e/2PACX-1vS3s-al3s9rwdhK0FHls7J368zMl0Hdryc_y6MVwwXaiWLpgzImXs_9YsC5lXkwRdi_aPMi_gRHfsei/pub?output=csv";
+const regiUrl="https://docs.google.com/spreadsheets/d/e/2PACX-1vSnZTHT3SeW7VWywFDBWhvjor0NqrwEcXPyBPOH53FD_Z5GHPNhO4NlGfpzniRjpuJBHna8vZJ1Ndia/pub?output=csv";
+
+document.getElementById("loadBtn").onclick=()=>{
+  document.getElementById("loadBtn").innerText="Loading...";
+  Promise.all([
+    fetchCSV(questUrl).then(d=>questData=d),
+    fetchCSV(itemUrl).then(d=>itemData=d),
+    fetchCSV(evUrl).then(d=>evData=d),
+    fetchCSV(regiUrl).then(d=>regiData=d)
+  ]).then(()=>{
+    setupQuest();
+    setupItem();
+    setupEV();
+    setupRegi();
+    document.getElementById("loader").style.display="none";
+    document.getElementById("main").style.display="block";
+  });
+};
+
+function fetchCSV(url){
+  return new Promise(res=>{
+    Papa.parse(url,{download:true,header:true,complete:r=>res(r.data.filter(x=>Object.values(x).some(v=>v)))});
+  });
+}
+
+// Quest Helper
+function setupQuest(){
+  let regions=[...new Set(questData.map(r=>r.Region).filter(Boolean))];
+  let sel=document.getElementById("questRegion");
+  regions.forEach(r=>sel.add(new Option(r,r)));
+  sel.onchange=()=>{
+    let qs=questData.filter(x=>x.Region===sel.value).map(x=>x.Quest);
+    let uniq=[...new Set(qs)];
+    let qSel=document.getElementById("questQuest");
+    qSel.innerHTML="<option value=''>Select Quest</option>";
+    uniq.forEach(q=>qSel.add(new Option(q,q)));
   };
-
-  let questData=[], itemData=[], evData=[], regiData=[];
-
-  function loadCSV(url){ return new Promise((res,rej)=>Papa.parse(url,{download:true,header:true,complete:r=>res(r.data),error:rej})) }
-
-  async function loadData(){
-    document.getElementById("loadStatus").innerText="Loading data...";
-    [questData,itemData,evData,regiData]=await Promise.all([loadCSV(urls.quest),loadCSV(urls.items),loadCSV(urls.ev),loadCSV(urls.regi)]);
-    document.getElementById("loading").classList.add("hidden");
-    document.getElementById("app").classList.remove("hidden");
-    initQuest();initItems();initEV();initRegi();initShoal();
+}
+function showQuest(){
+  let r=document.getElementById("questRegion").value;
+  let q=document.getElementById("questQuest").value;
+  let row=questData.find(x=>x.Region===r&&x.Quest===q);
+  if(row){
+    document.getElementById("questResult").innerHTML=makeTable([row]);
   }
+}
 
-  // Quest
-  function initQuest(){
-    const regionSel=document.getElementById("questRegion");
-    const questSel=document.getElementById("questName");
-    regionSel.innerHTML='<option value="">Select Region</option>';
-    [...new Set(questData.map(r=>r.Region).filter(x=>x))].forEach(r=>{
-      let o=document.createElement("option");o.value=o.textContent=r;regionSel.appendChild(o);
-    });
-    regionSel.onchange=()=>{
-      questSel.innerHTML="";
-      questData.filter(r=>r.Region===regionSel.value).forEach(q=>{
-        let o=document.createElement("option");o.value=o.textContent=q.Quest;questSel.appendChild(o);
-      });
-    };
-    document.getElementById("questShow").onclick=()=>{
-      const r=questData.find(q=>q.Region===regionSel.value && q.Quest===questSel.value);
-      if(!r)return;
-      document.getElementById("questResult").innerHTML=`
-        <table><tr><th>Region</th><th>Quest</th><th>Content</th></tr>
-        <tr><td>${r.Region}</td><td>${r.Quest}</td><td><pre class="content">${r.Content}</pre></td></tr></table>`;
-    };
-  }
+// Item Finder
+function setupItem(){
+  let regions=[...new Set(itemData.map(r=>r.region).filter(Boolean))];
+  let sel=document.getElementById("itemRegion");
+  regions.forEach(r=>sel.add(new Option(r,r)));
+  sel.onchange=()=>{
+    let locs=[...new Set(itemData.filter(x=>x.region===sel.value).map(x=>x.location))];
+    let lSel=document.getElementById("itemLocation");
+    lSel.innerHTML="<option value=''>Select Location</option>";
+    locs.forEach(l=>lSel.add(new Option(l,l)));
+  };
+  document.getElementById("itemLocation").onchange=()=>{
+    let reg=document.getElementById("itemRegion").value;
+    let loc=document.getElementById("itemLocation").value;
+    let items=[...new Set(itemData.filter(x=>x.region===reg&&x.location===loc).map(x=>x.item))];
+    let iSel=document.getElementById("itemItem");
+    iSel.innerHTML="<option value=''>Select Item</option>";
+    items.forEach(i=>iSel.add(new Option(i,i)));
+  };
+}
+function manualItemSearch(){
+  let term=document.getElementById("itemSearch").value.toLowerCase();
+  let rows=itemData.filter(r=>r.item.toLowerCase().includes(term));
+  document.getElementById("itemResult").innerHTML=rows.length?makeTable(rows):"currently not listed";
+}
+function filteredItemSearch(){
+  let reg=document.getElementById("itemRegion").value;
+  let loc=document.getElementById("itemLocation").value;
+  let itm=document.getElementById("itemItem").value;
+  let rows=itemData.filter(r=>r.region===reg&&r.location===loc&&r.item===itm);
+  document.getElementById("itemResult").innerHTML=rows.length?makeTable(rows):"currently not listed";
+}
 
-  // Items
-  function initItems(){
-    const regSel=document.getElementById("itemRegion");
-    const locSel=document.getElementById("itemLocation");
-    const itemSel=document.getElementById("itemName");
-    regSel.innerHTML='<option value="">Select Region</option>';
-    [...new Set(itemData.map(r=>r.region).filter(x=>x))].forEach(r=>{
-      let o=document.createElement("option");o.value=o.textContent=r;regSel.appendChild(o);
-    });
-    regSel.onchange=()=>{
-      locSel.innerHTML="";itemSel.innerHTML="";
-      [...new Set(itemData.filter(r=>r.region===regSel.value).map(r=>r.location))].forEach(l=>{
-        let o=document.createElement("option");o.value=o.textContent=l;locSel.appendChild(o);
-      });
-    };
-    locSel.onchange=()=>{
-      itemSel.innerHTML="";
-      [...new Set(itemData.filter(r=>r.region===regSel.value && r.location===locSel.value).map(r=>r.item))].forEach(i=>{
-        let o=document.createElement("option");o.value=o.textContent=i;itemSel.appendChild(o);
-      });
-    };
-    document.getElementById("itemSearchBtn").onclick=()=>{
-      let q=document.getElementById("itemSearch").value.toLowerCase();
-      let row=itemData.find(r=>(r.item||"").toLowerCase().includes(q));
-      document.getElementById("itemResult").innerHTML=row?tableRow(row):"<p>currently not listed</p>";
-    };
-    document.getElementById("itemFilterBtn").onclick=()=>{
-      let row=itemData.find(r=>r.region===regSel.value&&r.location===locSel.value&&r.item===itemSel.value);
-      document.getElementById("itemResult").innerHTML=row?tableRow(row):"";
-    };
-  }
+// EV Spot Finder
+function setupEV(){
+  let regions=[...new Set(evData.map(r=>r.region).filter(Boolean))];
+  let sel=document.getElementById("evRegion");
+  regions.forEach(r=>sel.add(new Option(r,r)));
+  sel.onchange=()=>{
+    let evs=[...new Set(evData.filter(x=>x.region===sel.value).map(x=>x.EV))];
+    let eSel=document.getElementById("evValue");
+    eSel.innerHTML="<option value=''>Select EV</option>";
+    evs.forEach(e=>eSel.add(new Option(e,e)));
+  };
+}
+function showEV(){
+  let r=document.getElementById("evRegion").value;
+  let ev=document.getElementById("evValue").value;
+  let rows=evData.filter(x=>x.region===r&&x.EV===ev);
+  document.getElementById("evResult").innerHTML=makeTable(rows);
+}
 
-  // EV
-  function initEV(){
-    const regSel=document.getElementById("evRegion");
-    const statSel=document.getElementById("evStat");
-    regSel.innerHTML='<option value="">Select Region</option>';
-    [...new Set(evData.map(r=>r.region).filter(x=>x))].forEach(r=>{
-      let o=document.createElement("option");o.value=o.textContent=r;regSel.appendChild(o);
-    });
-    regSel.onchange=()=>{
-      statSel.innerHTML="";
-      [...new Set(evData.filter(r=>r.region===regSel.value).map(r=>r.EV))].forEach(s=>{
-        let o=document.createElement("option");o.value=o.textContent=s;statSel.appendChild(o);
-      });
-    };
-    document.getElementById("evShow").onclick=()=>{
-      const rows=evData.filter(r=>r.region===regSel.value&&r.EV===statSel.value);
-      if(!rows.length)return;
-      document.getElementById("evResult").innerHTML=tableRows(rows);
-    };
-  }
+// Regi Trio
+function setupRegi(){
+  let times=[...new Set(regiData.map(r=>r.time).filter(Boolean))];
+  let sel=document.getElementById("regiTime");
+  times.forEach(t=>sel.add(new Option(t,t)));
+  sel.onchange=()=>{
+    let rows=regiData.filter(x=>x.time===sel.value);
+    document.getElementById("regiResult").innerHTML=makeTable(rows);
+  };
+}
 
-  // Regi
-  function initRegi(){
-    const sel=document.getElementById("regiTime");
-    sel.innerHTML='<option value="">Select Time</option>';
-    [...new Set(regiData.map(r=>r.time).filter(x=>x))].forEach(t=>{
-      let o=document.createElement("option");o.value=o.textContent=t;sel.appendChild(o);
-    });
-    sel.onchange=()=>{
-      const row=regiData.find(r=>r.time===sel.value);
-      document.getElementById("regiResult").innerHTML=row?tableRow(row):"";
-    };
-  }
+// Shoal Cave
+function checkShoal(){
+  let now=new Date();
+  let utcH=now.getUTCHours(), utcM=now.getUTCMinutes();
+  let minutes=utcH*60+utcM;
+  let low=[[0,180],[360,540],[720,900],[1080,1260]];
+  let isLow=low.some(([s,e])=>minutes>=s&&minutes<e);
+  document.getElementById("shoalResult").innerText=isLow?"Lowtide":"Hightide";
+}
 
-  // Shoal
-  function initShoal(){
-    function check(){
-      const now=new Date();
-      const utcH=now.getUTCHours(),utcM=now.getUTCMinutes();
-      const mins=utcH*60+utcM;
-      function inRange(start,end){
-        const [sh,sm]=start.split(":").map(Number),[eh,em]=end.split(":").map(Number);
-        return mins>=sh*60+sm && mins<eh*60+em;
-      }
-      const low=[["00:00","03:00"],["06:00","09:00"],["12:00","15:00"],["18:00","21:00"]];
-      const lowtide=low.some(([s,e])=>inRange(s,e));
-      document.getElementById("shoalResult").innerText=lowtide?"Lowtide":"Hightide";
-    }
-    check();setInterval(check,60000);
-  }
+// Helpers
+function makeTable(rows){
+  if(!rows.length) return "No results";
+  let headers=Object.keys(rows[0]);
+  let html="<table><tr>"+headers.map(h=>"<th>"+h+"</th>").join("")+"</tr>";
+  rows.forEach(r=>{
+    html+="<tr>"+headers.map(h=>"<td>"+(r[h]||"")+"</td>").join("")+"</tr>";
+  });
+  return html+"</table>";
+}
 
-  function tableRow(row){ 
-    let keys=Object.keys(row); 
-    return `<table><tr>${keys.map(k=>`<th>${k}</th>`).join("")}</tr>
-            <tr>${keys.map(k=>`<td>${row[k]}</td>`).join("")}</tr></table>`; 
-  }
-  function tableRows(rows){ 
-    let keys=Object.keys(rows[0]); 
-    return `<table><tr>${keys.map(k=>`<th>${k}</th>`).join("")}</tr>
-      ${rows.map(r=>`<tr>${keys.map(k=>`<td>${r[k]}</td>`).join("")}</tr>`).join("")}</table>`;
-  }
-
-  // Events
-  document.getElementById("loadBtn").onclick=loadData;
-  document.getElementById("darkToggle").onclick=()=>document.body.classList.toggle("dark-mode");
+document.getElementById("darkToggle").onclick=()=>document.body.classList.toggle("dark-mode");
 </script>
 </body>
 </html>

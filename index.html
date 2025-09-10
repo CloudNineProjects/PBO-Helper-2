@@ -1,338 +1,563 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PBO Quest & Item Tools</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PBO Quest & Items Helper</title>
+
+  <!-- PapaParse for robust CSV parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #ffffff;
-      color: #000000;
-      margin: 0;
-      padding: 0;
+    :root {
+      --accent: #0b74de;
+      --highlight: #FFE8C6;
+      --bg: #ffffff;
+      --text: #0b1720;
+      --card-radius: 10px;
     }
-    header {
-      display: flex;
-      justify-content: flex-end;
-      padding: 10px;
-    }
-    button {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      margin: 5px;
-    }
-    button:hover {
-      opacity: 0.9;
-    }
-    .section {
-      margin: 20px;
-      padding: 15px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-    }
-    .highlight {
-      background-color: #FFE8C6;
-    }
-    table {
-      border-collapse: collapse;
-      margin-top: 10px;
-      width: 100%;
-    }
-    th, td {
-      border: 1px solid #999;
-      padding: 6px;
-      text-align: left;
-    }
-    #loading-screen {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      text-align: center;
-    }
-    #app {
-      display: none;
-    }
-    .dark-mode {
-      background: #121212;
-      color: #f1f1f1;
-    }
-    .dark-mode .section {
-      border: 1px solid #555;
-    }
-    .dark-mode table {
-      border: 1px solid #555;
-      background: #1e1e1e;
-    }
-    .dark-mode th, 
-    .dark-mode td {
-      border: 1px solid #555;
-      color: #f1f1f1;
-    }
-    .dark-mode .highlight {
-      background: #5a4636;
-    }
-    .dark-mode button {
-      background: #333;
-      color: #f1f1f1;
-    }
+    body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial; margin:0; background:var(--bg); color:var(--text); }
+    header { display:flex; justify-content:flex-end; padding:10px 16px; gap:8px; align-items:center; }
+    .container { max-width:1100px; margin:0 auto; padding:8px; }
+    button { padding:8px 12px; border-radius:8px; border:none; cursor:pointer; background:var(--accent); color:white; }
+    button.secondary { background:#eef3fb; color:var(--text); }
+    h1 { margin:0 0 8px 0; font-size:1.25rem; }
+    .loading-screen { height:100vh; display:flex; align-items:center; justify-content:center; }
+    .loader-inner { text-align:center; }
+    .loader-inner img { max-width:220px; display:block; margin:0 auto 12px; }
+    .card { border-radius:var(--card-radius); padding:14px; margin:16px 0; box-shadow:0 6px 20px rgba(10,20,40,0.06); border:1px solid rgba(10,20,40,0.04); background:#fff; }
+    .card.highlight { background:var(--highlight); }
+    label { display:inline-flex; gap:8px; align-items:center; margin-right:12px; }
+    select,input[type="text"] { padding:8px; border-radius:8px; border:1px solid #e6eef9; width:100%; max-width:420px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+    table { width:100%; border-collapse:collapse; margin-top:12px; }
+    th,td { padding:8px; border-bottom:1px solid #eef3fb; text-align:left; vertical-align:top; }
+    .muted { color:#6b7280; font-size:0.95rem; }
+    .hidden { display:none; }
+
+    /* Dark mode */
+    .dark-mode { --bg:#0b0b0b; --text:#e6eef9; }
+    .dark-mode .card { box-shadow:none; border:1px solid rgba(255,255,255,0.04); background:#0f1113; }
+    .dark-mode .card.highlight { background:#5a4636; }
+    .dark-mode table { background:transparent; }
+    .dark-mode th, .dark-mode td { border-bottom:1px solid rgba(255,255,255,0.06); color:var(--text); }
+    .dark-mode button { background:#1f2937; color:var(--text); }
+    .dark-mode button.secondary { background:#0b1220; color:var(--text); border:1px solid rgba(255,255,255,0.06); }
+
+    /* small helpers */
+    .section-title { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .small-note { font-size:0.92rem; color:#334155; margin-top:8px; }
+    pre.content { white-space:pre-wrap; font-family:inherit; margin:0; }
   </style>
 </head>
 <body>
   <header>
-    <button id="darkModeToggle">🌙 Dark Mode</button>
+    <button id="darkToggle" class="secondary">🌙 Dark Mode</button>
   </header>
 
-  <!-- Loading Screen -->
-  <div id="loading-screen">
-    <img src="https://i.imgur.com/XZcfQzw.png" alt="Loading Logo" style="max-width:200px; margin-bottom:20px;">
-    <button id="loadDataBtn">Load Data</button>
-    <p id="loadingText"></p>
-  </div>
-
-  <!-- App -->
-  <div id="app">
-    <!-- Quest Helper -->
-    <div class="section highlight">
-      <h2>Quest Helper</h2>
-      <select id="questRegionSelect"><option value="">Select Region</option></select>
-      <select id="questSelect" disabled><option value="">Select Quest</option></select>
-      <button id="questShowBtn">Show</button>
-      <div id="questResults"></div>
+  <main class="container">
+    <div id="loading" class="loading-screen">
+      <div class="loader-inner">
+        <img src="https://i.imgur.com/XZcfQzw.png" alt="Logo">
+        <div style="margin-top:10px">
+          <button id="loadBtn">Load Data</button>
+        </div>
+        <div id="loadStatus" class="muted" style="margin-top:10px"></div>
+      </div>
     </div>
 
-    <!-- Special Item Finder -->
-    <div class="section">
-      <h2>Special Item Finder</h2>
-      <h3>Manual Search</h3>
-      <input type="text" id="itemInput" placeholder="Enter Item" />
-      <button id="itemSearchBtn">Search</button>
-      <div id="itemResults"></div>
+    <div id="app" class="hidden">
+      <h1>PBO Quest & Items Helper</h1>
 
-      <h3>Filtered Search</h3>
-      <select id="itemRegionSelect"><option value="">Select Region</option></select>
-      <select id="itemLocationSelect" disabled><option value="">Select Location</option></select>
-      <select id="itemSelect" disabled><option value="">Select Item</option></select>
-      <button id="itemFilterSearchBtn">Search</button>
-      <div id="itemFilterResults"></div>
+      <!-- Quest Helper (highlight) -->
+      <section id="questCard" class="card highlight">
+        <div class="section-title"><strong>Quest Helper</strong><span class="muted">Region → Quest → Show</span></div>
+        <div class="row" style="margin-top:12px">
+          <select id="questRegion"><option value="">Select Region</option></select>
+          <select id="questQuest" disabled><option value="">Select Quest</option></select>
+          <button id="questShowBtn">Show</button>
+          <button id="questResetBtn" class="secondary">Reset</button>
+        </div>
+        <div id="questOutput" style="margin-top:12px"></div>
+        <div class="small-note">Content keeps leading hyphens and line breaks.</div>
+      </section>
+
+      <!-- Special Item Finder (plain) -->
+      <section id="itemCard" class="card">
+        <div class="section-title"><strong>Special Item Finder</strong><span class="muted">manual fuzzy search / filtered search</span></div>
+
+        <div style="margin-top:12px"><strong>Manual search (fuzzy)</strong></div>
+        <div class="row">
+          <input id="itemManual" type="text" placeholder="e.g. TM070 Trick Room or trick room" />
+          <button id="itemManualBtn">Search</button>
+          <button id="itemManualReset" class="secondary">Reset</button>
+        </div>
+        <div id="itemManualOut" style="margin-top:10px"></div>
+
+        <hr style="margin:16px 0">
+
+        <div><strong>Filtered search</strong></div>
+        <div class="row">
+          <select id="itemRegion"><option value="">Select Region</option></select>
+          <select id="itemLocation" disabled><option value="">Select Location</option></select>
+          <select id="itemName" disabled><option value="">Select Item</option></select>
+          <button id="itemFilterBtn">Search</button>
+          <button id="itemFilterReset" class="secondary">Reset</button>
+        </div>
+        <div id="itemFilterOut" style="margin-top:10px"></div>
+      </section>
+
+      <!-- EV Spot Finder (highlight) -->
+      <section id="evCard" class="card highlight">
+        <div class="section-title"><strong>EV Spot Finder</strong><span class="muted">Region → EV → Show (A–D)</span></div>
+        <div class="row" style="margin-top:12px">
+          <select id="evRegion"><option value="">Select Region</option></select>
+          <select id="evSelect" disabled><option value="">Select EV</option></select>
+          <button id="evShowBtn">Show</button>
+          <button id="evResetBtn" class="secondary">Reset</button>
+        </div>
+        <div id="evOutput" style="margin-top:12px"></div>
+      </section>
+
+      <!-- Regi Trio Check (plain) -->
+      <section id="regiCard" class="card">
+        <div class="section-title"><strong>Regi Trio Check</strong><span class="muted">Select time → Show A–C</span></div>
+        <div class="row" style="margin-top:12px">
+          <select id="regiTime"><option value="">Select Time</option></select>
+          <button id="regiShowBtn">Show</button>
+          <button id="regiResetBtn" class="secondary">Reset</button>
+        </div>
+        <div id="regiOutput" style="margin-top:12px"></div>
+      </section>
+
+      <!-- Shoal Cave Check (highlight) -->
+      <section id="shoalCard" class="card highlight">
+        <div class="section-title"><strong>Shoal Cave Check</strong><span class="muted">Checks system time (UTC) including minutes</span></div>
+        <div class="row" style="margin-top:12px">
+          <button id="shoalBtn">Check Tide Now</button>
+          <button id="shoalAutoBtn" class="secondary">Start Auto-Update (1m)</button>
+          <button id="shoalStopBtn" class="secondary" style="display:none">Stop Auto</button>
+        </div>
+        <div id="shoalOutput" style="margin-top:12px"></div>
+        <div class="small-note">Lowtide windows (UTC): 00:00–03:00, 06:00–09:00, 12:00–15:00, 18:00–21:00 (inclusive of minutes). Others → Hightide.</div>
+      </section>
+
     </div>
+  </main>
 
-    <!-- Regi Trio Check -->
-    <div class="section highlight">
-      <h2>Regi Trio Check</h2>
-      <select id="regiTimeSelect"><option value="">Select Time</option></select>
-      <button id="regiShowBtn">Show</button>
-      <div id="regiResults"></div>
-    </div>
+<script>
+/* === Utility: DOM helpers === */
+const $ = id => document.getElementById(id);
 
-    <!-- Shoal Cave Check -->
-    <div class="section">
-      <h2>Shoal Cave Check</h2>
-      <button id="shoalCheckBtn">Check Current Tide</button>
-      <div id="shoalResult"></div>
-    </div>
-  </div>
+/* === Data holders === */
+let questRows = [];   // array of objects
+let itemRows = [];
+let regiRows = [];
+let evRows = [];      // for EV sheet
 
-  <script>
-    // Dark Mode
-    const darkToggle = document.getElementById("darkModeToggle");
-    darkToggle.addEventListener("click", () => {
-      document.body.classList.toggle("dark-mode");
-      darkToggle.textContent = document.body.classList.contains("dark-mode") 
-        ? "☀️ Light Mode" : "🌙 Dark Mode";
-    });
+/* === Dark mode toggle === */
+$('darkToggle').addEventListener('click', () => {
+  document.body.classList.toggle('dark-mode');
+  $('darkToggle').textContent = document.body.classList.contains('dark-mode') ? '☀️ Light Mode' : '🌙 Dark Mode';
+});
 
-    // Loading
-    const loadBtn = document.getElementById("loadDataBtn");
-    const loadText = document.getElementById("loadingText");
-    const loadingScreen = document.getElementById("loading-screen");
-    const app = document.getElementById("app");
+/* === Load data (PapaParse used for robust CSV parsing) === */
+const QUEST_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSLUoaCoGaRwhc7rdFxpQuKmHSdYG5vlzYSjXYSAutTfowLYfmuuKxULAE-ePGl66uZpO7JKk97Yoo7/pub?output=csv';
+const ITEM_CSV  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSVGd00wRMYJ_keK_ESGV_RUw6yUHUbsexmiXfm9pp8vw_oUGnvYmCKMCNaKwvTNVi8lXED_Qi11edq/pub?output=csv';
+const REGI_CSV  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSnZTHT3SeW7VWywFDBWhvjor0NqrwEcXPyBPOH53FD_Z5GHPNhO4NlGfpzniRjpuJBHna8vZJ1Ndia/pub?output=csv';
+const EV_CSV    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS3s-al3s9rwdhK0FHls7J368zMl0Hdryc_y6MVwwXaiWLpgzImXs_9YsC5lXkwRdi_aPMi_gRHfsei/pub?output=csv';
 
-    loadBtn.addEventListener("click", async () => {
-      loadBtn.disabled = true;
-      loadText.textContent = "Loading...";
-      await loadData();
-      loadingScreen.style.display = "none";
-      app.style.display = "block";
-    });
+async function loadAll() {
+  setLoadStatus('Loading quest sheet...');
+  const q = await papaFetchCSV(QUEST_CSV);
+  setLoadStatus('Loading item sheet...');
+  const it = await papaFetchCSV(ITEM_CSV);
+  setLoadStatus('Loading regi sheet...');
+  const rg = await papaFetchCSV(REGI_CSV);
+  setLoadStatus('Loading EV sheet...');
+  const ev = await papaFetchCSV(EV_CSV);
 
-    // Sheets
-    const questSheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSLUoaCoGaRwhc7rdFxpQuKmHSdYG5vlzYSjXYSAutTfowLYfmuuKxULAE-ePGl66uZpO7JKk97Yoo7/pub?output=csv";
-    const itemSheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSVGd00wRMYJ_keK_ESGV_RUw6yUHUbsexmiXfm9pp8vw_oUGnvYmCKMCNaKwvTNVi8lXED_Qi11edq/pub?output=csv";
-    const regiSheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnZTHT3SeW7VWywFDBWhvjor0NqrwEcXPyBPOH53FD_Z5GHPNhO4NlGfpzniRjpuJBHna8vZJ1Ndia/pub?output=csv";
+  // normalize: PapaParse returns array of objects with headers as keys
+  questRows = q;   // expect keys: region, quest, content  (case-insensitive)
+  itemRows = it;   // expect keys: region, location, item, method
+  regiRows = rg;   // expect keys: time, a?, b?, c? or similar (we'll use first 3 columns)
+  evRows   = ev;   // expect keys: region, ?, c column (we'll use header names)
 
-    let questData = [];
-    let itemData = [];
-    let regiData = [];
+  populateQuestRegions();
+  populateItemRegions();
+  populateRegiTimes();
+  populateEvRegions();
 
-    async function fetchCSV(url) {
-      const res = await fetch(url);
-      const text = await res.text();
-      return text.split("\n").map(r => r.split(",").map(c => c.trim()));
-    }
+  setLoadStatus('Loaded.');
+}
 
-    async function loadData() {
-      questData = await fetchCSV(questSheet);
-      itemData = await fetchCSV(itemSheet);
-      regiData = await fetchCSV(regiSheet);
-
-      // Quest Helper - Region Select
-      const questRegionSelect = document.getElementById("questRegionSelect");
-      [...new Set(questData.slice(1).map(r => r[0]))].forEach(region => {
-        const opt = document.createElement("option");
-        opt.value = region;
-        opt.textContent = region;
-        questRegionSelect.appendChild(opt);
-      });
-
-      // Item Finder - Region Select
-      const itemRegionSelect = document.getElementById("itemRegionSelect");
-      [...new Set(itemData.slice(1).map(r => r[0]))].forEach(region => {
-        const opt = document.createElement("option");
-        opt.value = region;
-        opt.textContent = region;
-        itemRegionSelect.appendChild(opt);
-      });
-
-      // Regi Trio - Time Select
-      const regiTimeSelect = document.getElementById("regiTimeSelect");
-      [...new Set(regiData.slice(1).map(r => r[0]))].forEach(time => {
-        const opt = document.createElement("option");
-        opt.value = time;
-        opt.textContent = time;
-        regiTimeSelect.appendChild(opt);
-      });
-
-      loadText.textContent = "Loaded!";
-    }
-
-    function renderTable(headers, rows) {
-      if (!rows.length) return "<p>Currently not listed...</p>";
-      let html = "<table><thead><tr>";
-      headers.forEach(h => html += `<th>${h}</th>`);
-      html += "</tr></thead><tbody>";
-      rows.forEach(r => {
-        html += "<tr>" + r.map(c => `<td>${c}</td>`).join("") + "</tr>";
-      });
-      html += "</tbody></table>";
-      return html;
-    }
-
-    // Quest Helper
-    document.getElementById("questRegionSelect").addEventListener("change", e => {
-      const region = e.target.value;
-      const questSelect = document.getElementById("questSelect");
-      questSelect.innerHTML = "<option value=''>Select Quest</option>";
-      if (region) {
-        const quests = [...new Set(questData.slice(1).filter(r => r[0] === region).map(r => r[1]))];
-        quests.forEach(q => {
-          const opt = document.createElement("option");
-          opt.value = q;
-          opt.textContent = q;
-          questSelect.appendChild(opt);
+/* PapaFetch: returns array of row objects (header keys normalized to lowercase trimmed) */
+function papaFetchCSV(url) {
+  return new Promise((resolve, reject) => {
+    Papa.parse(url, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: (res) => {
+        // normalize keys to trimmed lowercase
+        const data = res.data.map(row => {
+          const out = {};
+          for (const k in row) {
+            if (Object.prototype.hasOwnProperty.call(row, k)) {
+              const key = (k || '').trim().toLowerCase();
+              out[key] = row[k];
+            }
+          }
+          return out;
         });
-        questSelect.disabled = false;
+        resolve(data);
+      },
+      error: (err) => reject(err)
+    });
+  });
+}
+
+function setLoadStatus(txt) { $('loadStatus').textContent = txt; }
+
+/* === wire load button === */
+$('loadBtn').addEventListener('click', async () => {
+  $('loadBtn').disabled = true;
+  setLoadStatus('Starting...');
+  try {
+    await loadAll();
+    // show app, hide loader
+    document.querySelector('#loading').style.display = 'none';
+    document.querySelector('#app').classList.remove('hidden');
+    document.querySelector('#app').style.display = 'block';
+  } catch (e) {
+    console.error(e);
+    setLoadStatus('Error loading data. See console.');
+    $('loadBtn').disabled = false;
+  }
+});
+
+/* ==============================
+   Quest Helper
+   ============================== */
+function populateQuestRegions() {
+  const sel = $('questRegion');
+  sel.innerHTML = '<option value="">Select Region</option>';
+  const regions = Array.from(new Set(questRows.map(r => (r['region']||'').trim()).filter(Boolean)));
+  regions.forEach(region => {
+    const opt = document.createElement('option'); opt.value = region; opt.textContent = region;
+    sel.appendChild(opt);
+  });
+}
+
+$('questRegion').addEventListener('change', () => {
+  const region = $('questRegion').value;
+  const questSel = $('questQuest');
+  questSel.innerHTML = '<option value="">Select Quest</option>';
+  questSel.disabled = true;
+  if (!region) return;
+  const quests = Array.from(new Set(questRows.filter(r => (r['region']||'').trim() === region).map(r => (r['quest']||'').trim()).filter(Boolean)));
+  quests.forEach(q => { const opt = document.createElement('option'); opt.value = q; opt.textContent = q; questSel.appendChild(opt); });
+  questSel.disabled = false;
+});
+
+$('questShowBtn').addEventListener('click', () => {
+  const region = $('questRegion').value;
+  const quest = $('questQuest').value;
+  const out = $('questOutput');
+  out.innerHTML = '';
+  if (!region || !quest) { out.innerHTML = '<p class="muted">Please select region and quest.</p>'; return; }
+  const headers = Object.keys(questRows[0] || {});
+  const rows = questRows.filter(r => (r['region']||'').trim() === region && (r['quest']||'').trim() === quest);
+  if (!rows.length) { out.innerHTML = '<p class="muted">No results.</p>'; return; }
+  // render table: ensure content (column likely 'content') preserves hyphens/newlines
+  const ths = headers.map(h => `<th>${h}</th>`).join('');
+  let html = `<table><thead><tr>${ths}</tr></thead><tbody>`;
+  rows.forEach(r => {
+    html += '<tr>';
+    headers.forEach(h => {
+      let cell = r[h] === undefined ? '' : String(r[h]);
+      if (h === 'content' || h === 'contents') {
+        // preserve leading hyphens & newlines — use <pre>
+        cell = `<pre class="content">${escapeHtml(cell)}</pre>`;
       } else {
-        questSelect.disabled = true;
+        cell = escapeHtml(cell);
       }
+      html += `<td>${cell}</td>`;
     });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  out.innerHTML = html;
+});
 
-    document.getElementById("questShowBtn").addEventListener("click", () => {
-      const region = document.getElementById("questRegionSelect").value;
-      const quest = document.getElementById("questSelect").value;
-      const container = document.getElementById("questResults");
-      if (region && quest) {
-        const headers = questData[0];
-        const rows = questData.slice(1).filter(r => r[0] === region && r[1] === quest);
-        container.innerHTML = renderTable(headers, rows);
+$('questResetBtn').addEventListener('click', () => {
+  $('questRegion').selectedIndex = 0;
+  $('questQuest').innerHTML = '<option value="">Select Quest</option>';
+  $('questQuest').disabled = true;
+  $('questOutput').innerHTML = '';
+});
+
+/* ==============================
+   Special Item Finder
+   ============================== */
+function populateItemRegions() {
+  const sel = $('itemRegion');
+  sel.innerHTML = '<option value="">Select Region</option>';
+  const regions = Array.from(new Set(itemRows.map(r => (r['region']||'').trim()).filter(Boolean)));
+  regions.forEach(region => { const opt = document.createElement('option'); opt.value = region; opt.textContent = region; sel.appendChild(opt); });
+}
+
+$('itemRegion').addEventListener('change', () => {
+  const region = $('itemRegion').value;
+  const locSel = $('itemLocation');
+  locSel.innerHTML = '<option value="">Select Location</option>';
+  $('itemName').innerHTML = '<option value="">Select Item</option>';
+  $('itemName').disabled = true;
+  if (!region) { locSel.disabled = true; return; }
+  const locs = Array.from(new Set(itemRows.filter(r => (r['region']||'').trim() === region).map(r => (r['location']||'').trim()).filter(Boolean)));
+  locs.forEach(l => { const opt = document.createElement('option'); opt.value = l; opt.textContent = l; locSel.appendChild(opt); });
+  locSel.disabled = false;
+});
+
+$('itemLocation').addEventListener('change', () => {
+  const region = $('itemRegion').value;
+  const location = $('itemLocation').value;
+  const nameSel = $('itemName');
+  nameSel.innerHTML = '<option value="">Select Item</option>';
+  if (!region || !location) { nameSel.disabled = true; return; }
+  const items = Array.from(new Set(itemRows.filter(r => (r['region']||'').trim() === region && (r['location']||'').trim() === location).map(r => (r['item']||'').trim()).filter(Boolean)));
+  items.forEach(i => { const opt = document.createElement('option'); opt.value = i; opt.textContent = i; nameSel.appendChild(opt); });
+  nameSel.disabled = false;
+});
+
+$('itemFilterBtn').addEventListener('click', () => {
+  const region = $('itemRegion').value;
+  const location = $('itemLocation').value;
+  const item = $('itemName').value;
+  const out = $('itemFilterOut');
+  out.innerHTML = '';
+  if (!region || !location || !item) { out.innerHTML = '<p class="muted">Please choose region, location and item.</p>'; return; }
+  const headers = Object.keys(itemRows[0] || {});
+  const rows = itemRows.filter(r => (r['region']||'').trim() === region && (r['location']||'').trim() === location && (r['item']||'').trim() === item);
+  if (!rows.length) { out.innerHTML = '<p class="muted">No results.</p>'; return; }
+  out.innerHTML = renderRowsAsTable(headers, rows);
+});
+
+$('itemFilterReset').addEventListener('click', () => {
+  $('itemRegion').selectedIndex = 0;
+  $('itemLocation').innerHTML = '<option value="">Select Location</option>'; $('itemLocation').disabled = true;
+  $('itemName').innerHTML = '<option value="">Select Item</option>'; $('itemName').disabled = true;
+  $('itemFilterOut').innerHTML = '';
+});
+
+/* Manual fuzzy search: substring case-insensitive over item column */
+$('itemManualBtn').addEventListener('click', () => {
+  const q = ($('itemManual').value || '').trim().toLowerCase();
+  const out = $('itemManualOut');
+  out.innerHTML = '';
+  if (!q) { out.innerHTML = '<p class="muted">Please enter an item name.</p>'; return; }
+  const headers = Object.keys(itemRows[0] || {});
+  // fuzzy: check if item string contains q OR q contains item? prefer contains
+  const rows = itemRows.filter(r => {
+    const it = (r['item']||'').toLowerCase();
+    return it.includes(q) || q.includes(it);
+  });
+  out.innerHTML = rows.length ? renderRowsAsTable(headers, rows) : '<p class="muted">Currently not listed.</p>';
+});
+
+$('itemManualReset').addEventListener('click', () => { $('itemManual').value=''; $('itemManualOut').innerHTML=''; });
+
+/* ==============================
+   EV Spot Finder
+   ============================== */
+function populateEvRegions() {
+  const sel = $('evRegion');
+  sel.innerHTML = '<option value="">Select Region</option>';
+  const regions = Array.from(new Set(evRows.map(r => (r['region']||'').trim()).filter(Boolean)));
+  regions.forEach(region => { const opt = document.createElement('option'); opt.value = region; opt.textContent = region; sel.appendChild(opt); });
+}
+$('evRegion').addEventListener('change', () => {
+  const region = $('evRegion').value;
+  const sel = $('evSelect');
+  sel.innerHTML = '<option value="">Select EV</option>';
+  sel.disabled = true;
+  if (!region) return;
+  // column C is presumably an EV name column; we find its header by index of keys
+  // We'll find first non-region header after region header or simply use 'ev' key candidates
+  // Safer: gather values of all non-empty fields from rows where region matches, then pick the 3rd column by header order if exists
+  const sample = evRows[0] || {};
+  const keys = Object.keys(sample);
+  // prefer header names: try 'ev' or third header
+  let evKey = keys.find(k => ['ev','spot','name','c','value'].includes(k.toLowerCase())) || keys[2] || keys[1];
+  const evs = Array.from(new Set(evRows.filter(r => (r['region']||'').trim() === region).map(r => (r[evKey]||'').trim()).filter(Boolean)));
+  evs.forEach(v => { const opt = document.createElement('option'); opt.value = v; opt.textContent = v; sel.appendChild(opt); });
+  sel.disabled = false;
+});
+
+$('evShowBtn').addEventListener('click', () => {
+  const region = $('evRegion').value;
+  const ev = $('evSelect').value;
+  const out = $('evOutput');
+  out.innerHTML = '';
+  if (!region || !ev) { out.innerHTML = '<p class="muted">Please select region and EV.</p>'; return; }
+  // Show columns A-D for matches
+  const headers = Object.keys(evRows[0] || {}).slice(0,4);
+  const rows = evRows.filter(r => (r['region']||'').trim() === region && ((r[headers[2]]||'').trim() === ev || (r[ Object.keys(r)[2] ]||'').trim() === ev));
+  if (!rows.length) { out.innerHTML = '<p class="muted">No results.</p>'; return; }
+  out.innerHTML = renderRowsAsTable(headers, rows);
+});
+
+$('evResetBtn').addEventListener('click', () => {
+  $('evRegion').selectedIndex = 0;
+  $('evSelect').innerHTML = '<option value="">Select EV</option>'; $('evSelect').disabled = true;
+  $('evOutput').innerHTML = '';
+});
+
+/* ==============================
+   Regi Trio Check (time select)
+   ============================== */
+function populateRegiTimes() {
+  const sel = $('regiTime');
+  sel.innerHTML = '<option value="">Select Time</option>';
+  // time in regiRows likely header like 'time'
+  const times = Array.from(new Set(regiRows.map(r => {
+    // find first header that looks like 'time'
+    const keys = Object.keys(r);
+    const timeKey = keys.find(k => k.toLowerCase().includes('time')) || keys[0];
+    return (r[timeKey]||'').trim();
+  }).filter(Boolean)));
+  times.forEach(t => { const opt = document.createElement('option'); opt.value = t; opt.textContent = t; sel.appendChild(opt); });
+}
+
+$('regiShowBtn').addEventListener('click', () => {
+  const t = $('regiTime').value;
+  const out = $('regiOutput');
+  out.innerHTML = '';
+  if (!t) { out.innerHTML = '<p class="muted">Please select a time.</p>'; return; }
+  const sample = regiRows[0] || {};
+  const keys = Object.keys(sample);
+  const timeKey = keys.find(k => k.toLowerCase().includes('time')) || keys[0];
+  // display first three columns A–C (we interpret as keys[0..2])
+  const headers = keys.slice(0,3);
+  const rows = regiRows.filter(r => ((r[timeKey]||'').trim() === t)).map(r => {
+    // produce array of values for A..C
+    return headers.map(h => r[h] || '');
+  });
+  out.innerHTML = rows.length ? renderRowsAsTable(headers, rows) : '<p class="muted">No results.</p>';
+});
+
+$('regiResetBtn').addEventListener('click', () => {
+  $('regiTime').selectedIndex = 0; $('regiOutput').innerHTML='';
+});
+
+/* ==============================
+   Shoal Cave Check (UTC with minutes)
+   ============================== */
+function isInIntervalUTC(now, startH, startM, endH, endM) {
+  // now is Date object; compare UTC time in minutes since midnight
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const start = startH*60 + startM;
+  const end = endH*60 + endM;
+  if (start <= end) {
+    return utcMinutes >= start && utcMinutes < end;
+  } else {
+    // overnight interval (e.g., 21:00 to 00:00) — treat end as next day
+    return utcMinutes >= start || utcMinutes < end;
+  }
+}
+
+function checkShoalNow() {
+  const now = new Date();
+  const out = $('shoalOutput');
+  // Lowtide windows (inclusive of minutes) per user:
+  const windows = [
+    [0,0,3,0],
+    [6,0,9,0],
+    [12,0,15,0],
+    [18,0,21,0]
+  ];
+  let low = false;
+  for (const w of windows) {
+    if (isInIntervalUTC(now, w[0], w[1], w[2], w[3])) { low = true; break; }
+  }
+  const utcH = String(now.getUTCHours()).padStart(2,'0');
+  const utcM = String(now.getUTCMinutes()).padStart(2,'0');
+  const tide = low ? 'Lowtide' : 'Hightide';
+  out.innerHTML = `<p>UTC time: ${utcH}:${utcM} — <strong>${tide}</strong></p>`;
+}
+
+/* Shoal buttons */
+$('shoalBtn').addEventListener('click', checkShoalNow);
+
+let shoalIntervalId = null;
+$('shoalAutoBtn').addEventListener('click', () => {
+  if (shoalIntervalId) return;
+  checkShoalNow();
+  shoalIntervalId = setInterval(checkShoalNow, 60_000); // every minute
+  $('shoalAutoBtn').style.display = 'none';
+  $('shoalStopBtn').style.display = 'inline-block';
+});
+$('shoalStopBtn').addEventListener('click', () => {
+  if (shoalIntervalId) clearInterval(shoalIntervalId);
+  shoalIntervalId = null;
+  $('shoalAutoBtn').style.display = 'inline-block';
+  $('shoalStopBtn').style.display = 'none';
+});
+
+/* ==============================
+   Helpers: render table and escape html
+   ============================== */
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[s]);
+}
+
+function renderRowsAsTable(headers, rows) {
+  if (!rows || !rows.length) return '<p class="muted">No results.</p>';
+  let html = '<table><thead><tr>';
+  headers.forEach(h => html += `<th>${escapeHtml(h)}</th>`);
+  html += '</tr></thead><tbody>';
+  rows.forEach(r => {
+    html += '<tr>';
+    headers.forEach(h => {
+      let v = (r[h] === undefined ? '' : r[h]);
+      // if header likely 'content', render pre-wrap to keep '-' bullets & linebreaks
+      if (h.toLowerCase() === 'content' || h.toLowerCase().includes('content')) {
+        html += `<td><pre class="content">${escapeHtml(String(v))}</pre></td>`;
       } else {
-        container.innerHTML = "<p>Please select both region and quest.</p>";
+        html += `<td>${escapeHtml(String(v))}</td>`;
       }
     });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
 
-    // Item Finder - Manual Search
-    document.getElementById("itemSearchBtn").addEventListener("click", () => {
-      const query = document.getElementById("itemInput").value.trim().toLowerCase();
-      const headers = itemData[0];
-      const rows = itemData.slice(1).filter(r => r[2] && r[2].toLowerCase() === query);
-      document.getElementById("itemResults").innerHTML = renderTable(headers, rows);
-    });
+/* ==============================
+   Utility: populate initial selects that require loaded data
+   ============================== */
+function populateRegiTimes() {
+  const sel = $('regiTime');
+  sel.innerHTML = '<option value="">Select Time</option>';
+  if (!regiRows.length) return;
+  // find time header key
+  const sample = regiRows[0];
+  const timeKey = Object.keys(sample).find(k => k.toLowerCase().includes('time')) || Object.keys(sample)[0];
+  const times = Array.from(new Set(regiRows.map(r => (r[timeKey]||'').trim()).filter(Boolean)));
+  times.forEach(t => { const opt = document.createElement('option'); opt.value = t; opt.textContent = t; sel.appendChild(opt); });
+}
 
-    // Item Finder - Region Change
-    document.getElementById("itemRegionSelect").addEventListener("change", e => {
-      const region = e.target.value;
-      const locationSelect = document.getElementById("itemLocationSelect");
-      locationSelect.innerHTML = "<option value=''>Select Location</option>";
-      document.getElementById("itemSelect").innerHTML = "<option value=''>Select Item</option>";
-      if (region) {
-        const locations = [...new Set(itemData.slice(1).filter(r => r[0] === region).map(r => r[1]))];
-        locations.forEach(loc => {
-          const opt = document.createElement("option");
-          opt.value = loc;
-          opt.textContent = loc;
-          locationSelect.appendChild(opt);
-        });
-        locationSelect.disabled = false;
-      } else {
-        locationSelect.disabled = true;
-        document.getElementById("itemSelect").disabled = true;
-      }
-    });
+/* After PapaParse loads, call these populate functions in loadAll() before showing app.
+   But we also need to populate EV and Regi times once data present. We'll call them after load. */
 
-    // Item Finder - Location Change
-    document.getElementById("itemLocationSelect").addEventListener("change", e => {
-      const region = document.getElementById("itemRegionSelect").value;
-      const location = e.target.value;
-      const itemSelect = document.getElementById("itemSelect");
-      itemSelect.innerHTML = "<option value=''>Select Item</option>";
-      if (region && location) {
-        const items = [...new Set(itemData.slice(1).filter(r => r[0] === region && r[1] === location).map(r => r[2]))];
-        items.forEach(i => {
-          const opt = document.createElement("option");
-          opt.value = i;
-          opt.textContent = i;
-          itemSelect.appendChild(opt);
-        });
-        itemSelect.disabled = false;
-      } else {
-        itemSelect.disabled = true;
-      }
-    });
+/* In loadAll we already call populateX functions. But ensure regiTimeSelect created earlier */
+function populateRegiTimesCalled() { populateRegiTimes(); }
 
-    document.getElementById("itemFilterSearchBtn").addEventListener("click", () => {
-      const region = document.getElementById("itemRegionSelect").value;
-      const location = document.getElementById("itemLocationSelect").value;
-      const item = document.getElementById("itemSelect").value;
-      const headers = itemData[0];
-      const rows = itemData.slice(1).filter(r => r[0] === region && r[1] === location && r[2] === item);
-      document.getElementById("itemFilterResults").innerHTML = renderTable(headers, rows);
-    });
+/* Ensure renderRowsAsTable works for headers that are not exactly keys: for quest we used different render code. */
 
-    // Regi Trio
-    document.getElementById("regiShowBtn").addEventListener("click", () => {
-      const time = document.getElementById("regiTimeSelect").value;
-      const headers = regiData[0];
-      const rows = regiData.slice(1).filter(r => r[0] === time);
-      document.getElementById("regiResults").innerHTML = renderTable(headers, rows);
-    });
+/* Note: after loadAll execution we already invoked the populate functions above. */
 
-    // Shoal Cave
-    document.getElementById("shoalCheckBtn").addEventListener("click", () => {
-      const now = new Date();
-      const utcHour = now.getUTCHours();
-      let tide = "Hightide";
-      if ((utcHour >= 0 && utcHour < 3) ||
-          (utcHour >= 6 && utcHour < 9) ||
-          (utcHour >= 12 && utcHour < 15) ||
-          (utcHour >= 18 && utcHour < 21)) {
-        tide = "Lowtide";
-      }
-      document.getElementById("shoalResult").innerHTML = `<p>Current UTC Time: ${utcHour}:00 → ${tide}</p>`;
-    });
-  </script>
+</script>
 </body>
 </html>

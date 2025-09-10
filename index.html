@@ -1,234 +1,554 @@
-import React, { useState, useEffect } from "react";
-import Papa from "papaparse";
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>PBO Quest & Items Helper</title>
 
-const SHEETS = {
-  quest: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSLUoaCoGaRwhc7rdFxpQuKmHSdYG5vlzYSjXYSAutTfowLYfmuuKxULAE-ePGl66uZpO7JKk97Yoo7/pub?output=csv",
-  items: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSVGd00wRMYJ_keK_ESGV_RUw6yUHUbsexmiXfm9pp8vw_oUGnvYmCKMCNaKwvTNVi8lXED_Qi11edq/pub?output=csv",
-  regi: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnZTHT3SeW7VWywFDBWhvjor0NqrwEcXPyBPOH53FD_Z5GHPNhO4NlGfpzniRjpuJBHna8vZJ1Ndia/pub?output=csv",
-  ev: "https://docs.google.com/spreadsheets/d/e/2PACX-1vS3s-al3s9rwdhK0FHls7J368zMl0Hdryc_y6MVwwXaiWLpgzImXs_9YsC5lXkwRdi_aPMi_gRHfsei/pub?output=csv",
-};
+  <!-- PapaParse -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-export default function App() {
-  const [data, setData] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const [dark, setDark] = useState(false);
+  <style>
+    :root{
+      --accent:#0b74de;
+      --highlight:#FFE8C6;
+      --bg:#ffffff;
+      --text:#0b1720;
+      --card-radius:10px;
+    }
+    body{font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial;margin:0;background:var(--bg);color:var(--text)}
+    header{display:flex;justify-content:flex-end;padding:12px}
+    .container{max-width:1100px;margin:0 auto;padding:12px}
+    button{background:var(--accent);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
+    button.secondary{background:#eef3fb;color:var(--text)}
+    h1{margin:0 0 12px 0;font-size:1.25rem}
+    .loading-screen{height:100vh;display:flex;align-items:center;justify-content:center}
+    .loader-inner{text-align:center}
+    .loader-inner img{max-width:220px;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto}
+    .card{border-radius:var(--card-radius);padding:14px;margin:14px 0;box-shadow:0 6px 18px rgba(10,20,40,0.06);border:1px solid rgba(10,20,40,0.04);background:#fff}
+    .card.highlight{background:var(--highlight)}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:12px}
+    select,input[type="text"]{padding:8px;border-radius:8px;border:1px solid #e6eef9;width:100%;max-width:420px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:8px;border-bottom:1px solid #eef3fb;text-align:left;vertical-align:top}
+    pre.content{white-space:pre-wrap;font-family:inherit;margin:0}
+    .muted{color:#6b7280}
+    .hidden{display:none}
 
-  // Quest Helper
-  const [region, setRegion] = useState("");
-  const [quest, setQuest] = useState("");
+    /* Dark mode */
+    .dark-mode{--bg:#0b0b0b;--text:#e6eef9;background:#0b0b0b;color:#e6eef9}
+    .dark-mode .card{box-shadow:none;border:1px solid rgba(255,255,255,0.04);background:#0f1113}
+    .dark-mode .card.highlight{background:#5a4636}
+    .dark-mode select,input[type="text"]{background:#111214;color:#e6eef9;border:1px solid rgba(255,255,255,0.06)}
+    .dark-mode th,.dark-mode td{border-bottom:1px solid rgba(255,255,255,0.06);color:var(--text)}
+    .dark-mode button{background:#1f2937;color:var(--text)}
+    .dark-mode button.secondary{background:#0b1220;color:var(--text);border:1px solid rgba(255,255,255,0.06)}
 
-  // Item Finder
-  const [manual, setManual] = useState("");
-  const [regionItem, setRegionItem] = useState("");
-  const [locationItem, setLocationItem] = useState("");
-  const [item, setItem] = useState("");
+    /* small helpers */
+    .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .section-title { font-weight:600; }
+  </style>
+</head>
+<body>
+  <header>
+    <button id="darkToggle" class="secondary">🌙 Dark Mode</button>
+  </header>
 
-  // EV Spot
-  const [evRegion, setEvRegion] = useState("");
-  const [ev, setEv] = useState("");
+  <main class="container">
+    <!-- Loading -->
+    <div id="loading" class="loading-screen">
+      <div class="loader-inner">
+        <img src="https://i.imgur.com/XZcfQzw.png" alt="Logo">
+        <div style="margin-top:8px">
+          <button id="loadBtn">Load Data</button>
+        </div>
+        <div id="loadStatus" class="muted" style="margin-top:10px"></div>
+      </div>
+    </div>
 
-  // Regi
-  const [time, setTime] = useState("");
+    <!-- App -->
+    <div id="app" class="hidden">
+      <h1>PBO Quest & Items Helper</h1>
 
-  const fetchSheet = (url) =>
-    new Promise((resolve) => {
+      <!-- Quest Helper (highlight) -->
+      <section id="questCard" class="card highlight">
+        <div class="section-title">Quest Helper</div>
+        <div class="row">
+          <select id="questRegion"><option value="">-- Region --</option></select>
+          <select id="questQuest" disabled><option value="">-- Quest --</option></select>
+          <div class="controls">
+            <button id="questShow">Show</button>
+            <button id="questReset" class="secondary">Reset</button>
+          </div>
+        </div>
+        <div id="questOut" style="margin-top:12px"></div>
+      </section>
+
+      <!-- Special Item Finder (plain) -->
+      <section id="itemCard" class="card">
+        <div class="section-title">Special Item Finder</div>
+
+        <div style="margin-top:10px;font-weight:600">Manual search (fuzzy)</div>
+        <div class="row">
+          <input id="itemManual" type="text" placeholder="e.g. trick room">
+          <div class="controls">
+            <button id="itemManualBtn">Search</button>
+            <button id="itemManualReset" class="secondary">Reset</button>
+          </div>
+        </div>
+        <div id="itemManualOut" style="margin-top:10px"></div>
+
+        <div style="height:1px;background:transparent;margin:12px 0"></div>
+
+        <div style="font-weight:600">Filtered search</div>
+        <div class="row">
+          <select id="itemRegion"><option value="">-- Region --</option></select>
+          <select id="itemLocation" disabled><option value="">-- Location --</option></select>
+          <select id="itemName" disabled><option value="">-- Item --</option></select>
+          <div class="controls">
+            <button id="itemFilterBtn">Search</button>
+            <button id="itemFilterReset" class="secondary">Reset</button>
+          </div>
+        </div>
+        <div id="itemFilterOut" style="margin-top:10px"></div>
+      </section>
+
+      <!-- EV Spot Finder (highlight) -->
+      <section id="evCard" class="card highlight">
+        <div class="section-title">EV Spot Finder</div>
+        <div class="row">
+          <select id="evRegion"><option value="">-- Region --</option></select>
+          <select id="evSelect" disabled><option value="">-- EV --</option></select>
+          <div class="controls">
+            <button id="evShow">Show</button>
+            <button id="evReset" class="secondary">Reset</button>
+          </div>
+        </div>
+        <div id="evOut" style="margin-top:12px"></div>
+      </section>
+
+      <!-- Regi Trio Check (plain) -->
+      <section id="regiCard" class="card">
+        <div class="section-title">Regi Trio Check</div>
+        <div class="row">
+          <select id="regiTime"><option value="">-- Time --</option></select>
+          <div class="controls">
+            <button id="regiShow">Show</button>
+            <button id="regiReset" class="secondary">Reset</button>
+          </div>
+        </div>
+        <div id="regiOut" style="margin-top:12px"></div>
+      </section>
+
+      <!-- Shoal Cave Check (highlight) -->
+      <section id="shoalCard" class="card highlight">
+        <div class="section-title">Shoal Cave Check</div>
+        <div class="row">
+          <div class="controls">
+            <button id="shoalBtn">Check Tide Now</button>
+            <button id="shoalAuto" class="secondary">Start Auto (1m)</button>
+            <button id="shoalStop" class="secondary" style="display:none">Stop Auto</button>
+          </div>
+        </div>
+        <div id="shoalOut" style="margin-top:12px"></div>
+      </section>
+
+    </div>
+  </main>
+
+<script>
+  // helpers
+  const $ = id => document.getElementById(id);
+  const escapeHtml = s => (s === null || s === undefined) ? '' : String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+  function normalizeHeader(h){
+    if(!h) return '';
+    return h.replace(/\uFEFF/g,'').trim().toLowerCase();
+  }
+
+  function findField(fields, candidates){
+    // fields: array of original header strings
+    // candidates: array of lower-case candidate names to match
+    if(!fields) return null;
+    for(const f of fields){
+      const n = normalizeHeader(f);
+      for(const c of candidates){
+        if(n === c) return f;
+      }
+    }
+    // fallback: return first field that contains candidate substring
+    for(const f of fields){
+      const n = normalizeHeader(f);
+      for(const c of candidates){
+        if(n.includes(c)) return f;
+      }
+    }
+    return null;
+  }
+
+  function uniqueTrim(arr){
+    return Array.from(new Set(arr.map(v => (v||'').toString().trim()).filter(Boolean)));
+  }
+
+  // CSV URLs
+  const QUEST_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSLUoaCoGaRwhc7rdFxpQuKmHSdYG5vlzYSjXYSAutTfowLYfmuuKxULAE-ePGl66uZpO7JKk97Yoo7/pub?output=csv';
+  const ITEM_CSV  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSVGd00wRMYJ_keK_ESGV_RUw6yUHUbsexmiXfm9pp8vw_oUGnvYmCKMCNaKwvTNVi8lXED_Qi11edq/pub?output=csv';
+  const REGI_CSV  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSnZTHT3SeW7VWywFDBWhvjor0NqrwEcXPyBPOH53FD_Z5GHPNhO4NlGfpzniRjpuJBHna8vZJ1Ndia/pub?output=csv';
+  const EV_CSV    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS3s-al3s9rwdhK0FHls7J368zMl0Hdryc_y6MVwwXaiWLpgzImXs_9YsC5lXkwRdi_aPMi_gRHfsei/pub?output=csv';
+
+  // data containers
+  let questSheet = { rows: [], fields: [] };
+  let itemSheet  = { rows: [], fields: [] };
+  let regiSheet  = { rows: [], fields: [] };
+  let evSheet    = { rows: [], fields: [] };
+
+  // dark toggle
+  $('darkToggle').addEventListener('click', () => {
+    document.body.classList.toggle('dark-mode');
+    $('darkToggle').textContent = document.body.classList.contains('dark-mode') ? '☀️ Light Mode' : '🌙 Dark Mode';
+  });
+
+  // load data with PapaParse
+  async function parseCsvUrl(url){
+    return new Promise((resolve, reject) => {
       Papa.parse(url, {
         download: true,
         header: true,
-        complete: (res) => resolve(res.data.filter((r) => Object.values(r).some((x) => x))),
+        skipEmptyLines: true,
+        transformHeader: h => h ? h.trim() : h,
+        complete: (res) => {
+          const rows = res.data.map(r => {
+            // keep original keys (header text) as returned
+            const out = {};
+            for(const key in r){
+              if(Object.prototype.hasOwnProperty.call(r,key)){
+                out[key] = r[key];
+              }
+            }
+            return out;
+          });
+          resolve({ rows, fields: res.meta.fields || [] });
+        },
+        error: (err) => reject(err)
       });
     });
+  }
 
-  const loadData = async () => {
-    setLoading(true);
-    const [quest, items, regi, ev] = await Promise.all([
-      fetchSheet(SHEETS.quest),
-      fetchSheet(SHEETS.items),
-      fetchSheet(SHEETS.regi),
-      fetchSheet(SHEETS.ev),
-    ]);
-    setData({ quest, items, regi, ev });
-    setLoaded(true);
-    setLoading(false);
-  };
+  async function loadAll(){
+    try{
+      $('loadStatus').textContent = 'Loading quest...';
+      const q = await parseCsvUrl(QUEST_CSV);
+      $('loadStatus').textContent = 'Loading items...';
+      const it = await parseCsvUrl(ITEM_CSV);
+      $('loadStatus').textContent = 'Loading regi...';
+      const rg = await parseCsvUrl(REGI_CSV);
+      $('loadStatus').textContent = 'Loading EV...';
+      const ev = await parseCsvUrl(EV_CSV);
 
-  // Shoal Cave
-  const getShoal = () => {
+      questSheet = q; itemSheet = it; regiSheet = rg; evSheet = ev;
+
+      // populate initial selects
+      populateQuestRegions();
+      populateItemRegions();
+      populateEvRegions();
+      populateRegiTimes();
+
+      $('loadStatus').textContent = 'Loaded.';
+      // show app
+      $('loading').style.display = 'none';
+      $('app').classList.remove('hidden');
+      $('app').style.display = 'block';
+    }catch(e){
+      console.error(e);
+      $('loadStatus').textContent = 'Error loading data. See console.';
+      $('loadBtn').disabled = false;
+    }
+  }
+
+  $('loadBtn').addEventListener('click', async () => {
+    $('loadBtn').disabled = true;
+    $('loadStatus').textContent = 'Starting...';
+    await loadAll();
+  });
+
+  /* ===== Quest Helper ===== */
+  function populateQuestRegions(){
+    const sel = $('questRegion');
+    sel.innerHTML = '<option value="">-- Region --</option>';
+    if(!questSheet.rows.length) return;
+    // find header for region & quest & content
+    const regionKey = findField(questSheet.fields, ['region']);
+    const qKeys = questSheet.rows.map(r => r[regionKey] ? r[regionKey].toString().trim() : '');
+    const opts = uniqueTrim(qKeys);
+    opts.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
+  }
+
+  $('questRegion').addEventListener('change', () => {
+    const region = $('questRegion').value;
+    const sel = $('questQuest'); sel.innerHTML = '<option value="">-- Quest --</option>'; sel.disabled = true;
+    if(!region) return;
+    const regionKey = findField(questSheet.fields,['region']);
+    const questKey = findField(questSheet.fields,['quest']);
+    const rows = questSheet.rows.filter(r => (r[regionKey]||'').toString().trim() === region);
+    const qvals = uniqueTrim(rows.map(r => r[questKey] ? r[questKey].toString().trim() : ''));
+    qvals.forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
+    sel.disabled = false;
+  });
+
+  $('questShow').addEventListener('click', () => {
+    const region = $('questRegion').value;
+    const quest = $('questQuest').value;
+    const out = $('questOut'); out.innerHTML = '';
+    if(!region || !quest){ out.innerHTML = '<p class="muted">Please select region and quest.</p>'; return; }
+    const regionKey = findField(questSheet.fields,['region']);
+    const questKey  = findField(questSheet.fields,['quest']);
+    const contentKey = findField(questSheet.fields,['content','contents']);
+    const headers = questSheet.fields.slice(); // original field order
+    const rows = questSheet.rows.filter(r => (r[regionKey]||'').toString().trim() === region && (r[questKey]||'').toString().trim() === quest);
+    if(!rows.length){ out.innerHTML = '<p class="muted">No results.</p>'; return; }
+    // render table with content as pre
+    let html = '<table><thead><tr>';
+    headers.forEach(h => html += `<th>${escapeHtml(h)}</th>`);
+    html += '</tr></thead><tbody>';
+    rows.forEach(r => {
+      html += '<tr>';
+      headers.forEach(h => {
+        let v = (r[h]===undefined || r[h]===null) ? '' : String(r[h]);
+        if(h === contentKey) {
+          html += `<td><pre class="content">${escapeHtml(v)}</pre></td>`;
+        } else {
+          html += `<td>${escapeHtml(v)}</td>`;
+        }
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    out.innerHTML = html;
+  });
+
+  $('questReset').addEventListener('click', () => {
+    $('questRegion').selectedIndex = 0;
+    $('questQuest').innerHTML = '<option value="">-- Quest --</option>'; $('questQuest').disabled = true;
+    $('questOut').innerHTML = '';
+  });
+
+  /* ===== Special Item Finder ===== */
+  function populateItemRegions(){
+    const sel = $('itemRegion'); sel.innerHTML = '<option value="">-- Region --</option>';
+    if(!itemSheet.rows.length) return;
+    const regionKey = findField(itemSheet.fields,['region']);
+    const vals = uniqueTrim(itemSheet.rows.map(r => r[regionKey] ? r[regionKey].toString().trim() : ''));
+    vals.forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
+  }
+
+  $('itemRegion').addEventListener('change', () => {
+    const region = $('itemRegion').value;
+    const locSel = $('itemLocation'); locSel.innerHTML = '<option value="">-- Location --</option>'; $('itemName').innerHTML = '<option value="">-- Item --</option>'; $('itemName').disabled = true;
+    if(!region){ locSel.disabled = true; return; }
+    const regionKey = findField(itemSheet.fields,['region']);
+    const locKey = findField(itemSheet.fields,['location']);
+    const vals = uniqueTrim(itemSheet.rows.filter(r => (r[regionKey]||'').toString().trim() === region).map(r => r[locKey] ? r[locKey].toString().trim() : ''));
+    vals.forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; locSel.appendChild(o); });
+    locSel.disabled = false;
+  });
+
+  $('itemLocation').addEventListener('change', () => {
+    const region = $('itemRegion').value;
+    const location = $('itemLocation').value;
+    const nameSel = $('itemName'); nameSel.innerHTML = '<option value="">-- Item --</option>';
+    if(!region || !location){ nameSel.disabled = true; return; }
+    const regionKey = findField(itemSheet.fields,['region']);
+    const locKey = findField(itemSheet.fields,['location']);
+    const itemKey = findField(itemSheet.fields,['item']);
+    const vals = uniqueTrim(itemSheet.rows.filter(r => (r[regionKey]||'').toString().trim()===region && (r[locKey]||'').toString().trim()===location).map(r => r[itemKey] ? r[itemKey].toString().trim() : ''));
+    vals.forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; nameSel.appendChild(o); });
+    nameSel.disabled = false;
+  });
+
+  $('itemFilterBtn').addEventListener('click', () => {
+    const region = $('itemRegion').value;
+    const location = $('itemLocation').value;
+    const item = $('itemName').value;
+    const out = $('itemFilterOut'); out.innerHTML = '';
+    if(!region || !location || !item){ out.innerHTML = '<p class="muted">Please select region, location and item.</p>'; return; }
+    const keys = itemSheet.fields;
+    const regionKey = findField(itemSheet.fields,['region']);
+    const locKey = findField(itemSheet.fields,['location']);
+    const itemKey = findField(itemSheet.fields,['item']);
+    const rows = itemSheet.rows.filter(r => (r[regionKey]||'').toString().trim()===region && (r[locKey]||'').toString().trim()===location && (r[itemKey]||'').toString().trim()===item);
+    if(!rows.length){ out.innerHTML = '<p class="muted">No results.</p>'; return; }
+    out.innerHTML = renderRowsAsTable(keys, rows);
+  });
+
+  $('itemFilterReset').addEventListener('click', () => {
+    $('itemRegion').selectedIndex = 0;
+    $('itemLocation').innerHTML = '<option value="">-- Location --</option>'; $('itemLocation').disabled = true;
+    $('itemName').innerHTML = '<option value="">-- Item --</option>'; $('itemName').disabled = true;
+    $('itemFilterOut').innerHTML = '';
+  });
+
+  // Manual fuzzy search
+  function normalizeForSearch(s){
+    return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim();
+  }
+
+  $('itemManualBtn').addEventListener('click', () => {
+    const q = normalizeForSearch($('itemManual').value);
+    const out = $('itemManualOut'); out.innerHTML = '';
+    if(!q){ out.innerHTML = '<p class="muted">Please enter a search term.</p>'; return; }
+    const itemKey = findField(itemSheet.fields,['item']);
+    const rows = itemSheet.rows.filter(r => {
+      const it = normalizeForSearch(r[itemKey]||'');
+      return it.includes(q) || q.includes(it);
+    });
+    if(!rows.length){ out.innerHTML = '<p class="muted">Currently not listed.</p>'; return; }
+    out.innerHTML = renderRowsAsTable(itemSheet.fields, rows);
+  });
+
+  $('itemManualReset').addEventListener('click', () => { $('itemManual').value=''; $('itemManualOut').innerHTML=''; });
+
+  /* ===== EV Spot Finder ===== */
+  function populateEvRegions(){
+    const sel = $('evRegion'); sel.innerHTML = '<option value="">-- Region --</option>';
+    if(!evSheet.rows.length) return;
+    const regionKey = findField(evSheet.fields,['region']);
+    const vals = uniqueTrim(evSheet.rows.map(r => r[regionKey] ? r[regionKey].toString().trim() : ''));
+    vals.forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
+  }
+
+  $('evRegion').addEventListener('change', () => {
+    const region = $('evRegion').value;
+    const sel = $('evSelect'); sel.innerHTML = '<option value="">-- EV --</option>'; sel.disabled = true;
+    if(!region) return;
+    // find EV column: prefer header with 'ev' or use third column if not found
+    const keys = evSheet.fields;
+    let evKey = findField(keys, ['ev','spot','name']) || keys[2] || keys[1] || keys[0];
+    const vals = uniqueTrim(evSheet.rows.filter(r => (r[findField(keys,['region'])]||'').toString().trim()===region).map(r => r[evKey] ? r[evKey].toString().trim() : ''));
+    vals.forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
+    sel.disabled = false;
+  });
+
+  $('evShow').addEventListener('click', () => {
+    const region = $('evRegion').value;
+    const evVal = $('evSelect').value;
+    const out = $('evOut'); out.innerHTML = '';
+    if(!region || !evVal){ out.innerHTML = '<p class="muted">Please select region and EV.</p>'; return; }
+    const keys = evSheet.fields.slice(0,4); // A-D
+    const regionKey = findField(evSheet.fields,['region']);
+    // find EV key similar as before
+    let evKey = findField(evSheet.fields, ['ev','spot','name']) || evSheet.fields[2] || evSheet.fields[1] || evSheet.fields[0];
+    const rows = evSheet.rows.filter(r => (r[regionKey]||'').toString().trim()===region && (r[evKey]||'').toString().trim()===evVal);
+    if(!rows.length){ out.innerHTML = '<p class="muted">No results.</p>'; return; }
+    out.innerHTML = renderRowsAsTable(keys, rows);
+  });
+
+  $('evReset').addEventListener('click', () => {
+    $('evRegion').selectedIndex = 0;
+    $('evSelect').innerHTML = '<option value="">-- EV --</option>'; $('evSelect').disabled = true;
+    $('evOut').innerHTML = '';
+  });
+
+  /* ===== Regi Trio Check ===== */
+  function populateRegiTimes(){
+    const sel = $('regiTime'); sel.innerHTML = '<option value="">-- Time --</option>';
+    if(!regiSheet.rows.length) return;
+    const timeKey = findField(regiSheet.fields, ['time']);
+    const vals = uniqueTrim(regiSheet.rows.map(r => r[timeKey] ? r[timeKey].toString().trim() : ''));
+    vals.forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
+  }
+
+  $('regiShow').addEventListener('click', () => {
+    const t = $('regiTime').value;
+    const out = $('regiOut'); out.innerHTML = '';
+    if(!t){ out.innerHTML = '<p class="muted">Please select time.</p>'; return; }
+    const timeKey = findField(regiSheet.fields,['time']);
+    // display columns A-C (first 3 fields)
+    const keys = regiSheet.fields.slice(0,3);
+    const rows = regiSheet.rows.filter(r => (r[timeKey]||'').toString().trim() === t);
+    if(!rows.length){ out.innerHTML = '<p class="muted">No results.</p>'; return; }
+    out.innerHTML = renderRowsAsTable(keys, rows);
+  });
+
+  $('regiReset').addEventListener('click', () => { $('regiTime').selectedIndex = 0; $('regiOut').innerHTML = ''; });
+
+  /* ===== Shoal Cave Check (minutes included) ===== */
+  function utcMinutesFromDate(d){
+    return d.getUTCHours()*60 + d.getUTCMinutes();
+  }
+
+  function inInterval(nowUTCMin, startH, startM, endH, endM){
+    const start = startH*60 + startM;
+    const end = endH*60 + endM;
+    if(start <= end) return nowUTCMin >= start && nowUTCMin < end;
+    // overnight (shouldn't be needed here) fallback:
+    return nowUTCMin >= start || nowUTCMin < end;
+  }
+
+  function checkShoalNow(){
     const now = new Date();
-    const h = now.getUTCHours();
-    const m = now.getUTCMinutes();
-    const t = h * 60 + m;
+    const m = utcMinutesFromDate(now);
     const windows = [
-      [0, 180],
-      [360, 540],
-      [720, 900],
-      [1080, 1260],
+      [0,0,3,0],
+      [6,0,9,0],
+      [12,0,15,0],
+      [18,0,21,0]
     ];
-    return windows.some(([s, e]) => t >= s && t < e) ? "Lowtide" : "Hightide";
-  };
+    let isLow = windows.some(w => inInterval(m, w[0], w[1], w[2], w[3]));
+    const hh = String(now.getUTCHours()).padStart(2,'0');
+    const mm = String(now.getUTCMinutes()).padStart(2,'0');
+    $('shoalOut').innerHTML = `<p>UTC ${hh}:${mm} — <strong>${isLow ? 'Lowtide' : 'Hightide'}</strong></p>`;
+  }
 
-  const unique = (arr) => [...new Set(arr.filter(Boolean))];
+  $('shoalBtn').addEventListener('click', checkShoalNow);
 
-  const fuzzy = (hay, needle) => hay.toLowerCase().includes(needle.toLowerCase());
+  let shoalInterval = null;
+  $('shoalAuto').addEventListener('click', () => {
+    if(shoalInterval) return;
+    checkShoalNow();
+    shoalInterval = setInterval(checkShoalNow, 60_000);
+    $('shoalAuto').style.display = 'none';
+    $('shoalStop').style.display = 'inline-block';
+  });
+  $('shoalStop').addEventListener('click', () => {
+    if(shoalInterval) clearInterval(shoalInterval);
+    shoalInterval = null;
+    $('shoalAuto').style.display = 'inline-block';
+    $('shoalStop').style.display = 'none';
+  });
 
-  const Table = ({ rows }) => (
-    <table>
-      <thead>
-        <tr>
-          {rows.length > 0 &&
-            Object.keys(rows[0]).map((k) => <th key={k}>{k}</th>)}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r, i) => (
-          <tr key={i}>
-            {Object.values(r).map((v, j) => (
-              <td key={j} style={{ whiteSpace: "pre-line" }}>
-                {v}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
+  /* ===== Helpers render table ===== */
+  function renderRowsAsTable(headers, rows){
+    if(!rows || !rows.length) return '<p class="muted">No results.</p>';
+    let html = '<table><thead><tr>';
+    headers.forEach(h => html += `<th>${escapeHtml(h)}</th>`);
+    html += '</tr></thead><tbody>';
+    rows.forEach(r => {
+      html += '<tr>';
+      headers.forEach(h => {
+        const v = r[h] === undefined || r[h] === null ? '' : String(r[h]);
+        if(h && normalizeHeader(h).includes('content')) {
+          html += `<td><pre class="content">${escapeHtml(v)}</pre></td>`;
+        } else {
+          html += `<td>${escapeHtml(v)}</td>`;
+        }
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
 
-  if (!loaded)
-    return (
-      <div className={dark ? "dark" : ""}>
-        <button onClick={loadData} disabled={loading}>
-          {loading ? "Loading..." : "Load Data"}
-        </button>
-        <button onClick={() => setDark(!dark)}>Toggle Dark</button>
-        <img
-          src="https://i.imgur.com/XZcfQzw.png"
-          alt="loading"
-          style={{ marginTop: "20px" }}
-        />
-      </div>
-    );
+  // populate functions called after loadAll
+  function populateItemRegions(){ populateItemRegionsInner(); } // alias used earlier
+  function populateEvRegions(){ populateEvRegions(); } // alias (calls the same function above)
+  function populateRegiTimes(){ populateRegiTimes(); } // alias (calls the same function above)
 
-  return (
-    <div className={dark ? "dark" : ""}>
-      <button onClick={() => setDark(!dark)}>Toggle Dark</button>
+  // fix: ensure functions defined earlier are available under those names (they are)
 
-      {/* Quest Helper */}
-      <section style={{ background: "#FFE8C6", padding: "10px" }}>
-        <h2>Quest Helper</h2>
-        <select onChange={(e) => setRegion(e.target.value)} value={region}>
-          <option value="">Select Region</option>
-          {unique(data.quest.map((r) => r.region)).map((r) => (
-            <option key={r}>{r}</option>
-          ))}
-        </select>
-        {region && (
-          <select onChange={(e) => setQuest(e.target.value)} value={quest}>
-            <option value="">Select Quest</option>
-            {data.quest
-              .filter((r) => r.region === region)
-              .map((r, i) => (
-                <option key={i}>{r.quest}</option>
-              ))}
-          </select>
-        )}
-        {quest && (
-          <Table rows={data.quest.filter((r) => r.region === region && r.quest === quest)} />
-        )}
-      </section>
+  // small fix: after parsing, we must ensure the populate functions use the freshly loaded sheet variables.
+  // already done inside loadAll
 
-      {/* Item Finder */}
-      <section style={{ padding: "10px" }}>
-        <h2>Special Item Finder</h2>
-        <input
-          value={manual}
-          onChange={(e) => setManual(e.target.value)}
-          placeholder="Manual search"
-        />
-        <button>
-          Search
-        </button>
-        {manual &&
-          (data.items.filter((r) => fuzzy(r.item || "", manual)).length > 0 ? (
-            <Table rows={data.items.filter((r) => fuzzy(r.item || "", manual))} />
-          ) : (
-            <p>currently not listed</p>
-          ))}
-
-        <select onChange={(e) => setRegionItem(e.target.value)} value={regionItem}>
-          <option value="">Select Region</option>
-          {unique(data.items.map((r) => r.region)).map((r) => (
-            <option key={r}>{r}</option>
-          ))}
-        </select>
-        {regionItem && (
-          <select onChange={(e) => setLocationItem(e.target.value)} value={locationItem}>
-            <option value="">Select Location</option>
-            {unique(
-              data.items.filter((r) => r.region === regionItem).map((r) => r.location)
-            ).map((l) => (
-              <option key={l}>{l}</option>
-            ))}
-          </select>
-        )}
-        {locationItem && (
-          <select onChange={(e) => setItem(e.target.value)} value={item}>
-            <option value="">Select Item</option>
-            {unique(
-              data.items
-                .filter((r) => r.region === regionItem && r.location === locationItem)
-                .map((r) => r.item)
-            ).map((i) => (
-              <option key={i}>{i}</option>
-            ))}
-          </select>
-        )}
-        {item && (
-          <Table
-            rows={data.items.filter(
-              (r) => r.region === regionItem && r.location === locationItem && r.item === item
-            )}
-          />
-        )}
-      </section>
-
-      {/* EV Spot Finder */}
-      <section style={{ background: "#FFE8C6", padding: "10px" }}>
-        <h2>EV Spot Finder</h2>
-        <select onChange={(e) => setEvRegion(e.target.value)} value={evRegion}>
-          <option value="">Select Region</option>
-          {unique(data.ev.map((r) => r.region)).map((r) => (
-            <option key={r}>{r}</option>
-          ))}
-        </select>
-        {evRegion && (
-          <select onChange={(e) => setEv(e.target.value)} value={ev}>
-            <option value="">Select EV</option>
-            {unique(data.ev.filter((r) => r.region === evRegion).map((r) => r.EV)).map((v) => (
-              <option key={v}>{v}</option>
-            ))}
-          </select>
-        )}
-        {ev && <Table rows={data.ev.filter((r) => r.region === evRegion && r.EV === ev)} />}
-      </section>
-
-      {/* Regi Trio */}
-      <section style={{ padding: "10px" }}>
-        <h2>Regi Trio Check</h2>
-        <select onChange={(e) => setTime(e.target.value)} value={time}>
-          <option value="">Select Time</option>
-          {unique(data.regi.map((r) => r.time)).map((t) => (
-            <option key={t}>{t}</option>
-          ))}
-        </select>
-        {time && <Table rows={data.regi.filter((r) => r.time === time)} />}
-      </section>
-
-      {/* Shoal Cave */}
-      <section style={{ background: "#FFE8C6", padding: "10px" }}>
-        <h2>Shoal Cave Check</h2>
-        <p>{getShoal()}</p>
-      </section>
-    </div>
-  );
-}
+</script>
+</body>
+</html>

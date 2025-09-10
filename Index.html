@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PBO Quest & Item Tools</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+      color: #000000;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      display: flex;
+      justify-content: flex-end;
+      padding: 10px;
+    }
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    .section {
+      margin: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    .highlight {
+      background-color: #FFE8C6;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 10px;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 6px;
+      text-align: left;
+    }
+    #loading-screen {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      text-align: center;
+    }
+    #app {
+      display: none;
+    }
+    .dark-mode {
+      background: #121212;
+      color: #f1f1f1;
+    }
+    .dark-mode .section {
+      border: 1px solid #555;
+    }
+    .dark-mode table {
+      border: 1px solid #555;
+      background: #1e1e1e;
+    }
+    .dark-mode th, 
+    .dark-mode td {
+      border: 1px solid #555;
+      color: #f1f1f1;
+    }
+    .dark-mode .highlight {
+      background: #5a4636;
+    }
+    .dark-mode button {
+      background: #333;
+      color: #f1f1f1;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <button id="darkModeToggle">🌙 Dark Mode</button>
+  </header>
+
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <img src="https://i.imgur.com/XZcfQzw.png" alt="Loading Logo" style="max-width:200px; margin-bottom:20px;">
+    <button id="loadDataBtn">Load Data</button>
+    <p id="loadingText"></p>
+  </div>
+
+  <!-- App -->
+  <div id="app">
+    <!-- Quest Helper -->
+    <div class="section highlight">
+      <h2>Quest Helper</h2>
+      <select id="questRegionSelect"><option value="">Select Region</option></select>
+      <select id="questSelect" disabled><option value="">Select Quest</option></select>
+      <button id="questShowBtn">Show</button>
+      <div id="questResults"></div>
+    </div>
+
+    <!-- Special Item Finder -->
+    <div class="section">
+      <h2>Special Item Finder</h2>
+      <h3>Manual Search</h3>
+      <input type="text" id="itemInput" placeholder="Enter Item" />
+      <button id="itemSearchBtn">Search</button>
+      <div id="itemResults"></div>
+
+      <h3>Filtered Search</h3>
+      <select id="itemRegionSelect"><option value="">Select Region</option></select>
+      <select id="itemLocationSelect" disabled><option value="">Select Location</option></select>
+      <select id="itemSelect" disabled><option value="">Select Item</option></select>
+      <button id="itemFilterSearchBtn">Search</button>
+      <div id="itemFilterResults"></div>
+    </div>
+
+    <!-- Regi Trio Check -->
+    <div class="section highlight">
+      <h2>Regi Trio Check</h2>
+      <select id="regiTimeSelect"><option value="">Select Time</option></select>
+      <button id="regiShowBtn">Show</button>
+      <div id="regiResults"></div>
+    </div>
+
+    <!-- Shoal Cave Check -->
+    <div class="section">
+      <h2>Shoal Cave Check</h2>
+      <button id="shoalCheckBtn">Check Current Tide</button>
+      <div id="shoalResult"></div>
+    </div>
+  </div>
+
+  <script>
+    // Dark Mode
+    const darkToggle = document.getElementById("darkModeToggle");
+    darkToggle.addEventListener("click", () => {
+      document.body.classList.toggle("dark-mode");
+      darkToggle.textContent = document.body.classList.contains("dark-mode") 
+        ? "☀️ Light Mode" : "🌙 Dark Mode";
+    });
+
+    // Loading
+    const loadBtn = document.getElementById("loadDataBtn");
+    const loadText = document.getElementById("loadingText");
+    const loadingScreen = document.getElementById("loading-screen");
+    const app = document.getElementById("app");
+
+    loadBtn.addEventListener("click", async () => {
+      loadBtn.disabled = true;
+      loadText.textContent = "Loading...";
+      await loadData();
+      loadingScreen.style.display = "none";
+      app.style.display = "block";
+    });
+
+    // Sheets
+    const questSheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSLUoaCoGaRwhc7rdFxpQuKmHSdYG5vlzYSjXYSAutTfowLYfmuuKxULAE-ePGl66uZpO7JKk97Yoo7/pub?output=csv";
+    const itemSheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSVGd00wRMYJ_keK_ESGV_RUw6yUHUbsexmiXfm9pp8vw_oUGnvYmCKMCNaKwvTNVi8lXED_Qi11edq/pub?output=csv";
+    const regiSheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnZTHT3SeW7VWywFDBWhvjor0NqrwEcXPyBPOH53FD_Z5GHPNhO4NlGfpzniRjpuJBHna8vZJ1Ndia/pub?output=csv";
+
+    let questData = [];
+    let itemData = [];
+    let regiData = [];
+
+    async function fetchCSV(url) {
+      const res = await fetch(url);
+      const text = await res.text();
+      return text.split("\n").map(r => r.split(",").map(c => c.trim()));
+    }
+
+    async function loadData() {
+      questData = await fetchCSV(questSheet);
+      itemData = await fetchCSV(itemSheet);
+      regiData = await fetchCSV(regiSheet);
+
+      // Quest Helper - Region Select
+      const questRegionSelect = document.getElementById("questRegionSelect");
+      [...new Set(questData.slice(1).map(r => r[0]))].forEach(region => {
+        const opt = document.createElement("option");
+        opt.value = region;
+        opt.textContent = region;
+        questRegionSelect.appendChild(opt);
+      });
+
+      // Item Finder - Region Select
+      const itemRegionSelect = document.getElementById("itemRegionSelect");
+      [...new Set(itemData.slice(1).map(r => r[0]))].forEach(region => {
+        const opt = document.createElement("option");
+        opt.value = region;
+        opt.textContent = region;
+        itemRegionSelect.appendChild(opt);
+      });
+
+      // Regi Trio - Time Select
+      const regiTimeSelect = document.getElementById("regiTimeSelect");
+      [...new Set(regiData.slice(1).map(r => r[0]))].forEach(time => {
+        const opt = document.createElement("option");
+        opt.value = time;
+        opt.textContent = time;
+        regiTimeSelect.appendChild(opt);
+      });
+
+      loadText.textContent = "Loaded!";
+    }
+
+    function renderTable(headers, rows) {
+      if (!rows.length) return "<p>Currently not listed...</p>";
+      let html = "<table><thead><tr>";
+      headers.forEach(h => html += `<th>${h}</th>`);
+      html += "</tr></thead><tbody>";
+      rows.forEach(r => {
+        html += "<tr>" + r.map(c => `<td>${c}</td>`).join("") + "</tr>";
+      });
+      html += "</tbody></table>";
+      return html;
+    }
+
+    // Quest Helper
+    document.getElementById("questRegionSelect").addEventListener("change", e => {
+      const region = e.target.value;
+      const questSelect = document.getElementById("questSelect");
+      questSelect.innerHTML = "<option value=''>Select Quest</option>";
+      if (region) {
+        const quests = [...new Set(questData.slice(1).filter(r => r[0] === region).map(r => r[1]))];
+        quests.forEach(q => {
+          const opt = document.createElement("option");
+          opt.value = q;
+          opt.textContent = q;
+          questSelect.appendChild(opt);
+        });
+        questSelect.disabled = false;
+      } else {
+        questSelect.disabled = true;
+      }
+    });
+
+    document.getElementById("questShowBtn").addEventListener("click", () => {
+      const region = document.getElementById("questRegionSelect").value;
+      const quest = document.getElementById("questSelect").value;
+      const container = document.getElementById("questResults");
+      if (region && quest) {
+        const headers = questData[0];
+        const rows = questData.slice(1).filter(r => r[0] === region && r[1] === quest);
+        container.innerHTML = renderTable(headers, rows);
+      } else {
+        container.innerHTML = "<p>Please select both region and quest.</p>";
+      }
+    });
+
+    // Item Finder - Manual Search
+    document.getElementById("itemSearchBtn").addEventListener("click", () => {
+      const query = document.getElementById("itemInput").value.trim().toLowerCase();
+      const headers = itemData[0];
+      const rows = itemData.slice(1).filter(r => r[2] && r[2].toLowerCase() === query);
+      document.getElementById("itemResults").innerHTML = renderTable(headers, rows);
+    });
+
+    // Item Finder - Region Change
+    document.getElementById("itemRegionSelect").addEventListener("change", e => {
+      const region = e.target.value;
+      const locationSelect = document.getElementById("itemLocationSelect");
+      locationSelect.innerHTML = "<option value=''>Select Location</option>";
+      document.getElementById("itemSelect").innerHTML = "<option value=''>Select Item</option>";
+      if (region) {
+        const locations = [...new Set(itemData.slice(1).filter(r => r[0] === region).map(r => r[1]))];
+        locations.forEach(loc => {
+          const opt = document.createElement("option");
+          opt.value = loc;
+          opt.textContent = loc;
+          locationSelect.appendChild(opt);
+        });
+        locationSelect.disabled = false;
+      } else {
+        locationSelect.disabled = true;
+        document.getElementById("itemSelect").disabled = true;
+      }
+    });
+
+    // Item Finder - Location Change
+    document.getElementById("itemLocationSelect").addEventListener("change", e => {
+      const region = document.getElementById("itemRegionSelect").value;
+      const location = e.target.value;
+      const itemSelect = document.getElementById("itemSelect");
+      itemSelect.innerHTML = "<option value=''>Select Item</option>";
+      if (region && location) {
+        const items = [...new Set(itemData.slice(1).filter(r => r[0] === region && r[1] === location).map(r => r[2]))];
+        items.forEach(i => {
+          const opt = document.createElement("option");
+          opt.value = i;
+          opt.textContent = i;
+          itemSelect.appendChild(opt);
+        });
+        itemSelect.disabled = false;
+      } else {
+        itemSelect.disabled = true;
+      }
+    });
+
+    document.getElementById("itemFilterSearchBtn").addEventListener("click", () => {
+      const region = document.getElementById("itemRegionSelect").value;
+      const location = document.getElementById("itemLocationSelect").value;
+      const item = document.getElementById("itemSelect").value;
+      const headers = itemData[0];
+      const rows = itemData.slice(1).filter(r => r[0] === region && r[1] === location && r[2] === item);
+      document.getElementById("itemFilterResults").innerHTML = renderTable(headers, rows);
+    });
+
+    // Regi Trio
+    document.getElementById("regiShowBtn").addEventListener("click", () => {
+      const time = document.getElementById("regiTimeSelect").value;
+      const headers = regiData[0];
+      const rows = regiData.slice(1).filter(r => r[0] === time);
+      document.getElementById("regiResults").innerHTML = renderTable(headers, rows);
+    });
+
+    // Shoal Cave
+    document.getElementById("shoalCheckBtn").addEventListener("click", () => {
+      const now = new Date();
+      const utcHour = now.getUTCHours();
+      let tide = "Hightide";
+      if ((utcHour >= 0 && utcHour < 3) ||
+          (utcHour >= 6 && utcHour < 9) ||
+          (utcHour >= 12 && utcHour < 15) ||
+          (utcHour >= 18 && utcHour < 21)) {
+        tide = "Lowtide";
+      }
+      document.getElementById("shoalResult").innerHTML = `<p>Current UTC Time: ${utcHour}:00 → ${tide}</p>`;
+    });
+  </script>
+</body>
+</html>
